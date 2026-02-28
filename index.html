@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Spelling Game</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&family=Noto+Sans+JP:wght@400;700&display=swap');
+
+:root {
+–bg: #fff9f0;
+–primary: #ff7043;
+–primary-dark: #e64a19;
+–secondary: #42a5f5;
+–secondary-dark: #1976d2;
+–green: #66bb6a;
+–red: #ef5350;
+–yellow: #ffd54f;
+–purple: #ab47bc;
+–card: #ffffff;
+–text: #37474f;
+–text-light: #78909c;
+–box-border: #b0bec5;
+–box-bg: #f5f9ff;
+–radius: 20px;
+–shadow: 0 4px 20px rgba(0,0,0,0.10);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+height: 100%;
+font-family: ‘Nunito’, ‘Noto Sans JP’, sans-serif;
+background: var(–bg);
+color: var(–text);
+overflow: hidden;
+}
+
+/* Full-screen fixed layout — no scroll, no keyboard push */
+#app {
+position: fixed;
+inset: 0;
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+padding: 16px;
+z-index: 1;
+}
+
+.screen { display: none; width: 100%; max-width: 420px; animation: fadeIn 0.3s ease; }
+.screen.active { display: flex; flex-direction: column; align-items: center; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+/* Decorative blobs */
+.deco { position:fixed; border-radius:50%; opacity:0.12; pointer-events:none; z-index:0; }
+.deco-1 { width:200px; height:200px; background:var(–primary);   top:-60px;   right:-60px; }
+.deco-2 { width:150px; height:150px; background:var(–secondary); bottom:-40px; left:-40px; }
+.deco-3 { width:80px;  height:80px;  background:var(–yellow);    top:40%;      left:-20px; }
+
+/* ─── START SCREEN ─── */
+.mascot { font-size:72px; margin-bottom:20px; animation:bounce 2s infinite; }
+@keyframes bounce { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-12px);} }
+.start-title {
+font-size:42px; font-weight:900; color:var(–primary);
+text-align:center; line-height:1.1; margin-bottom:6px;
+text-shadow:3px 3px 0 #ffe0d6;
+}
+.start-subtitle { font-size:15px; color:var(–text-light); margin-bottom:32px; text-align:center; }
+
+/* ─── BUTTONS ─── */
+.btn {
+display:flex; align-items:center; justify-content:center; gap:10px;
+width:100%; padding:16px 24px; border:none; border-radius:50px;
+font-family:‘Nunito’,sans-serif; font-size:19px; font-weight:800;
+cursor:pointer; transition:transform 0.12s, box-shadow 0.12s;
+-webkit-tap-highlight-color:transparent; touch-action:manipulation;
+}
+.btn:active  { transform:scale(0.96); }
+.btn:disabled{ opacity:0.4; pointer-events:none; }
+
+.btn-primary {
+background:linear-gradient(135deg,var(–primary),#ff8a65); color:white;
+box-shadow:0 6px 0 var(–primary-dark),0 8px 20px rgba(255,112,67,0.3);
+margin-bottom:12px;
+}
+.btn-primary:active { box-shadow:0 2px 0 var(–primary-dark); transform:translateY(4px); }
+
+.btn-secondary {
+background:linear-gradient(135deg,var(–secondary),#64b5f6); color:white;
+box-shadow:0 6px 0 var(–secondary-dark),0 8px 20px rgba(66,165,245,0.3);
+margin-bottom:12px;
+}
+.btn-secondary:active { box-shadow:0 2px 0 var(–secondary-dark); transform:translateY(4px); }
+
+.btn-ghost {
+background:transparent; color:var(–text-light);
+border:2px solid var(–box-border); font-size:15px; padding:11px 24px;
+}
+.btn-green {
+background:linear-gradient(135deg,var(–green),#81c784); color:white;
+box-shadow:0 6px 0 #388e3c,0 8px 20px rgba(102,187,106,0.3);
+}
+.btn-green:active { box-shadow:0 2px 0 #388e3c; transform:translateY(4px); }
+
+/* ─── GAME SCREEN LAYOUT ─── */
+#screen-game { justify-content:space-between; gap:0; }
+
+.game-header {
+display:flex; justify-content:space-between; align-items:center;
+width:100%; margin-bottom:10px; flex-shrink:0;
+}
+.progress-badge {
+background:var(–card); border-radius:50px; padding:7px 14px;
+font-size:13px; font-weight:700; color:var(–text-light); box-shadow:var(–shadow);
+}
+.score-badge {
+background:linear-gradient(135deg,var(–yellow),#ffcc02);
+border-radius:50px; padding:7px 14px; font-size:13px; font-weight:800;
+color:#795548; box-shadow:0 3px 0 #f9a825;
+}
+.timer-badge {
+background:linear-gradient(135deg,var(–purple),#ce93d8);
+border-radius:50px; padding:7px 14px; font-size:13px; font-weight:800;
+color:white; box-shadow:0 3px 0 #7b1fa2; min-width:64px; text-align:center;
+}
+
+/* ─── Word card ─── */
+.word-card {
+background:var(–card); border-radius:var(–radius); box-shadow:var(–shadow);
+padding:16px 20px; width:100%; text-align:center;
+margin-bottom:10px; flex-shrink:0;
+}
+.japanese-word {
+font-size:48px; font-weight:700; color:var(–text); line-height:1.2;
+margin-bottom:10px; font-family:‘Noto Sans JP’,sans-serif;
+}
+.speaker-btn {
+background:linear-gradient(135deg,#e8f5e9,#c8e6c9); border:none;
+border-radius:50px; padding:8px 20px; cursor:pointer;
+-webkit-tap-highlight-color:transparent; transition:transform 0.12s;
+display:inline-flex; align-items:center; gap:6px;
+font-family:‘Nunito’,sans-serif; font-size:13px; font-weight:700; color:#2e7d32;
+touch-action:manipulation;
+}
+.speaker-btn:active { transform:scale(0.94); }
+
+/* ─── Attempt dots ─── */
+.attempt-dots { display:flex; gap:8px; justify-content:center; margin-bottom:8px; flex-shrink:0; }
+.dot { width:11px; height:11px; border-radius:50%; background:var(–box-border); transition:background 0.2s; }
+.dot.used { background:var(–red); }
+
+/* ─── Answer slots ─── */
+.answer-slots-wrapper { width:100%; margin-bottom:8px; flex-shrink:0; }
+.answer-slots { display:flex; justify-content:center; gap:10px; padding:4px; }
+
+.answer-slot {
+width:58px; height:64px;
+border:3px dashed var(–box-border); border-radius:14px;
+background:var(–box-bg);
+display:flex; align-items:center; justify-content:center;
+font-size:28px; font-weight:900; color:var(–text); text-transform:uppercase;
+transition:border-color 0.15s, background 0.15s, transform 0.12s;
+flex-shrink:0; cursor:pointer;
+-webkit-tap-highlight-color:transparent; touch-action:manipulation;
+}
+.answer-slot.filled   { border-style:solid; border-color:var(–secondary); background:#e3f2fd; }
+.answer-slot.filled:active { transform:scale(0.93); }
+.answer-slot.correct  { border-color:var(–green);  background:#e8f5e9; color:#2e7d32; border-style:solid; }
+.answer-slot.incorrect{ border-color:var(–red);    background:#ffebee; color:#c62828; border-style:solid; }
+
+/* ─── Answer reveal ─── */
+.answer-reveal {
+background:#fff3e0; border:2px solid var(–yellow); border-radius:14px;
+padding:10px 18px; text-align:center; font-size:16px; font-weight:800;
+color:#e65100; display:none; margin-bottom:6px; flex-shrink:0; width:100%;
+}
+.answer-reveal span { font-size:22px; letter-spacing:3px; }
+
+/* ─── Scrabble tile tray ─── */
+.tile-tray-wrapper {
+width:100%; flex-shrink:0;
+background:#ede8df; border-radius:20px;
+padding:14px 10px; margin-bottom:10px;
+box-shadow:inset 0 3px 8px rgba(0,0,0,0.08);
+}
+.tile-tray { display:flex; justify-content:center; flex-wrap:wrap; gap:10px; }
+
+.tile {
+width:56px; height:62px;
+background:linear-gradient(160deg,#fdf6e3,#f5e6b8);
+border:2px solid #c8a84b;
+border-radius:10px;
+box-shadow:0 4px 0 #b8902a, 0 5px 10px rgba(0,0,0,0.18);
+display:flex; align-items:center; justify-content:center;
+font-size:28px; font-weight:900; color:#4a3000; text-transform:uppercase;
+cursor:pointer; user-select:none;
+-webkit-tap-highlight-color:transparent; touch-action:manipulation;
+/* opacity transition for seamless used/unused state — no animation re-trigger */
+transition:transform 0.1s, box-shadow 0.1s, opacity 0.18s ease;
+flex-shrink:0;
+animation:tileIn 0.2s ease backwards;
+}
+.tile:active { transform:scale(0.93) translateY(2px); box-shadow:0 2px 0 #b8902a; }
+/* used: fade out smoothly via transition, not a rebuild */
+.tile.used   { opacity:0; pointer-events:none; transition:opacity 0.18s ease; animation:none; }
+
+@keyframes tileIn {
+from { transform:scale(0.4) rotate(-15deg); opacity:0; }
+to   { transform:scale(1)   rotate(0deg);   opacity:1; }
+}
+
+/* ─── Action area ─── */
+.action-area { width:100%; display:flex; flex-direction:column; gap:8px; flex-shrink:0; }
+
+/* ─── Shake ─── */
+.shake { animation:shake 0.45s ease; }
+@keyframes shake {
+0%,100%{transform:translateX(0);}
+15%{transform:translateX(-8px);}
+30%{transform:translateX(8px);}
+50%{transform:translateX(-5px);}
+70%{transform:translateX(5px);}
+90%{transform:translateX(-3px);}
+}
+
+/* ─── Star pop ─── */
+.star-pop {
+position:fixed; top:40%; left:50%;
+transform:translate(-50%,-50%) scale(0);
+font-size:100px; animation:starAnim 0.85s ease forwards;
+pointer-events:none; z-index:1000;
+}
+@keyframes starAnim {
+0%  {transform:translate(-50%,-50%) scale(0);   opacity:1;}
+50% {transform:translate(-50%,-50%) scale(1.4); opacity:1;}
+100%{transform:translate(-50%,-65%) scale(1.5); opacity:0;}
+}
+
+/* ─── Result screen ─── */
+.result-card {
+background:var(–card); border-radius:var(–radius); box-shadow:var(–shadow);
+padding:28px 22px; width:100%; text-align:center; margin-bottom:20px;
+}
+.result-emoji { font-size:60px; margin-bottom:8px; display:block; }
+.result-title { font-size:26px; font-weight:900; color:var(–primary); margin-bottom:18px; }
+.result-stat  { display:flex; justify-content:space-between; align-items:center; padding:11px 0; border-bottom:1px solid #f0f0f0; font-size:15px; }
+.result-stat:last-child { border-bottom:none; }
+.result-stat-label { color:var(–text-light); font-weight:700; }
+.result-stat-value { font-weight:900; font-size:20px; color:var(–text); }
+</style>
+
+</head>
+<body>
+
+<div class="deco deco-1"></div>
+<div class="deco deco-2"></div>
+<div class="deco deco-3"></div>
+
+<div id="app">
+
+  <!-- ══ START SCREEN ══ -->
+
+  <div id="screen-start" class="screen active">
+    <div class="mascot">🐣</div>
+    <div class="start-title">Spelling<br>Game!</div>
+    <div class="start-subtitle">えいごのスペルを練習しよう</div>
+    <div style="height:28px"></div>
+    <button class="btn btn-primary"   onclick="startGame('practice')">🌸 Practice Mode</button>
+    <button class="btn btn-secondary" onclick="startGame('challenge')">⏱️ Challenge Mode</button>
+  </div>
+
+  <!-- ══ GAME SCREEN ══ -->
+
+  <div id="screen-game" class="screen">
+
+```
+<div class="game-header">
+  <div class="progress-badge" id="progress-text">Q 1 / 10</div>
+  <div class="score-badge"    id="score-text">⭐ 0</div>
+  <div class="timer-badge"    id="timer-badge" style="display:none">0:00</div>
+</div>
+
+<div class="word-card">
+  <div class="japanese-word" id="japanese-word">りんご</div>
+  <button class="speaker-btn" id="speaker-btn" onclick="speak()">🔊 きく</button>
+</div>
+
+<div class="attempt-dots">
+  <div class="dot" id="dot-1"></div>
+  <div class="dot" id="dot-2"></div>
+</div>
+
+<!-- Answer slots — player drops tiles here -->
+<div class="answer-slots-wrapper">
+  <div class="answer-slots" id="answer-slots"></div>
+</div>
+
+<!-- Shown after 2nd failed attempt -->
+<div class="answer-reveal" id="answer-reveal">
+  こたえ: <span id="answer-reveal-text"></span>
+</div>
+
+<!-- Scrabble tile tray -->
+<div class="tile-tray-wrapper">
+  <div class="tile-tray" id="tile-tray"></div>
+</div>
+
+<div class="action-area">
+  <button class="btn btn-green" id="submit-btn" onclick="handleSubmit()" disabled>✅ Check!</button>
+  <button class="btn btn-ghost" id="back-to-start-btn" onclick="goToStart()">← Back to Start</button>
+</div>
+```
+
+  </div>
+
+  <!-- ══ RESULT SCREEN ══ -->
+
+  <div id="screen-result" class="screen">
+    <div class="result-card">
+      <span class="result-emoji" id="result-emoji">🎉</span>
+      <div  class="result-title" id="result-title">Finished!</div>
+      <div class="result-stat">
+        <span class="result-stat-label">Score</span>
+        <span class="result-stat-value" id="result-score">0 / 10</span>
+      </div>
+      <div class="result-stat" id="result-time-row" style="display:none">
+        <span class="result-stat-label">⏱ Time</span>
+        <span class="result-stat-value" id="result-time">0:00</span>
+      </div>
+      <div class="result-stat" id="result-best-row" style="display:none">
+        <span class="result-stat-label">🏆 Best</span>
+        <span class="result-stat-value" id="result-best">--</span>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="playAgain()">🔄 Play Again</button>
+    <button class="btn btn-ghost"   onclick="goToStart()">← Back to Start</button>
+  </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════
+   WORD LIST — all words max 5 letters
+═══════════════════════════════════════════════════ */
+const WORD_LIST = [
+  { japanese: "りんご", english: "apple" },
+  { japanese: "いぬ",   english: "dog"   },
+  { japanese: "ねこ",   english: "cat"   },
+  { japanese: "みず",   english: "water" },
+  { japanese: "ほん",   english: "book"  },
+  { japanese: "くるま", english: "car"   },
+  { japanese: "はな",   english: "rose"  },
+  { japanese: "そら",   english: "sky"   },
+  { japanese: "うみ",   english: "sea"   },
+  { japanese: "とり",   english: "bird"  },
+  { japanese: "さかな", english: "fish"  },
+  { japanese: "き",     english: "tree"  },
+  { japanese: "ほし",   english: "star"  },
+  { japanese: "つき",   english: "moon"  },
+  { japanese: "たまご", english: "egg"   },
+  { japanese: "パン",   english: "bread" },
+  { japanese: "くも",   english: "cloud" },
+  { japanese: "あめ",   english: "rain"  },
+  { japanese: "かぜ",   english: "wind"  },
+  { japanese: "ゆき",   english: "snow"  }
+];
+
+const WORDS_PER_SESSION = 10;
+
+/* ═══════════════════════════════════════════════════
+   GAME STATE
+═══════════════════════════════════════════════════ */
+let state = {
+  mode: 'practice',
+  words: [],
+  currentIndex: 0,
+  score: 0,
+  attempt: 1,
+  // answerSlots[i] = { letter, tileId } | null
+  answerSlots: [],
+  // tiles: [{ id, letter, used }, ...]
+  tiles: [],
+  // DOM refs built once per question, mutated in-place on every tap
+  slotEls: [],   // answer slot <div>s
+  tileEls: [],   // tile <div>s — index matches tiles[]
+  currentWord: null,
+  timerInterval: null,
+  elapsedSeconds: 0,
+  locked: false,
+};
+
+/* ═══════════════════════════════════════════════════
+   SCREEN MANAGEMENT
+═══════════════════════════════════════════════════ */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+/* ═══════════════════════════════════════════════════
+   START GAME
+═══════════════════════════════════════════════════ */
+function startGame(mode) {
+  state.mode = mode;
+  state.words = shuffle([...WORD_LIST]).slice(0, WORDS_PER_SESSION);
+  state.currentIndex = 0;
+  state.score = 0;
+  state.elapsedSeconds = 0;
+  clearInterval(state.timerInterval);
+  state.timerInterval = null;
+
+  const timerBadge = document.getElementById('timer-badge');
+  const backBtn    = document.getElementById('back-to-start-btn');
+
+  if (mode === 'challenge') {
+    timerBadge.style.display = 'flex';
+    backBtn.style.display = 'none';
+    startTimer();
+  } else {
+    timerBadge.style.display = 'none';
+    backBtn.style.display = 'flex';
+  }
+
+  showScreen('screen-game');
+  loadQuestion();
+}
+
+/* ═══════════════════════════════════════════════════
+   TIMER
+═══════════════════════════════════════════════════ */
+function startTimer() {
+  state.elapsedSeconds = 0;
+  updateTimerDisplay();
+  state.timerInterval = setInterval(() => {
+    state.elapsedSeconds++;
+    updateTimerDisplay();
+  }, 1000);
+}
+
+function stopTimer() {
+  clearInterval(state.timerInterval);
+  state.timerInterval = null;
+}
+
+function updateTimerDisplay() {
+  const m = Math.floor(state.elapsedSeconds / 60);
+  const s = state.elapsedSeconds % 60;
+  document.getElementById('timer-badge').textContent = `${m}:${s.toString().padStart(2,'0')}`;
+}
+
+function formatTime(sec) {
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return `${m}:${s.toString().padStart(2,'0')}`;
+}
+
+/* ═══════════════════════════════════════════════════
+   LOAD QUESTION
+   DOM elements are built ONCE here and refs stored in
+   state.slotEls / state.tileEls.  All subsequent updates
+   mutate those elements in-place — no innerHTML wipes,
+   no re-creation, no animation re-triggers.
+═══════════════════════════════════════════════════ */
+function loadQuestion() {
+  const word = state.words[state.currentIndex];
+  state.currentWord = word;
+  state.attempt     = 1;
+  state.locked      = false;
+
+  // Empty answer slots (data)
+  state.answerSlots = Array(word.english.length).fill(null);
+
+  // Tile data — shuffled letters
+  state.tiles = shuffle(word.english.split('')).map((letter, i) => ({
+    id: i,
+    letter: letter,
+    used: false
+  }));
+
+  // Header
+  document.getElementById('progress-text').textContent = `Q ${state.currentIndex + 1} / ${WORDS_PER_SESSION}`;
+  document.getElementById('score-text').textContent    = `⭐ ${state.score}`;
+  document.getElementById('japanese-word').textContent = word.japanese;
+
+  // Reset attempt dots
+  document.getElementById('dot-1').classList.remove('used');
+  document.getElementById('dot-2').classList.remove('used');
+
+  // Hide answer reveal banner
+  document.getElementById('answer-reveal').style.display = 'none';
+
+  // ── Build answer slot elements ONCE ──
+  const slotsContainer = document.getElementById('answer-slots');
+  slotsContainer.innerHTML = '';
+  state.slotEls = state.answerSlots.map((_, i) => {
+    const el = document.createElement('div');
+    el.className = 'answer-slot';
+    el.addEventListener('click', () => returnTile(i));
+    slotsContainer.appendChild(el);
+    return el;
+  });
+
+  // ── Build tile elements ONCE ──
+  const tray = document.getElementById('tile-tray');
+  tray.innerHTML = '';
+  state.tileEls = state.tiles.map((tile, idx) => {
+    const el = document.createElement('div');
+    el.className = 'tile';
+    el.textContent = tile.letter.toUpperCase();
+    el.style.animationDelay = (idx * 0.045) + 's';
+    el.addEventListener('click', () => placeTile(tile.id));
+    tray.appendChild(el);
+    return el;
+  });
+
+  updateSubmitBtn();
+}
+
+/* ═══════════════════════════════════════════════════
+   RENDER — in-place mutations only, no rebuilding
+═══════════════════════════════════════════════════ */
+
+/* Update answer slots by mutating existing elements */
+function renderAnswerSlots(colorStates) {
+  state.slotEls.forEach((el, i) => {
+    const slot = state.answerSlots[i];
+
+    // Reset to base state first
+    el.className = 'answer-slot';
+    el.textContent = '';
+
+    if (colorStates) {
+      // Feedback mode: colour each slot correct/incorrect
+      el.textContent = slot ? slot.letter.toUpperCase() : '';
+      el.classList.add(colorStates[i]);
+    } else if (slot) {
+      // Filled — show letter, solid border highlight
+      el.textContent = slot.letter.toUpperCase();
+      el.classList.add('filled');
+    }
+    // else: empty slot — dashed border, no text (default style)
+  });
+}
+
+/* Update tile tray by mutating existing elements */
+function renderTileTray() {
+  state.tileEls.forEach((el, idx) => {
+    const tile = state.tiles[idx];
+    // Toggle used class — CSS transition handles the fade
+    if (tile.used) {
+      el.classList.add('used');
+    } else {
+      el.classList.remove('used');
+    }
+  });
+}
+
+/* Convenience: update slots + tray + submit button */
+function renderAll(colorStates) {
+  renderAnswerSlots(colorStates);
+  renderTileTray();
+  updateSubmitBtn();
+}
+
+/* Enable / disable submit button */
+function updateSubmitBtn() {
+  const allFilled = state.answerSlots.every(s => s !== null);
+  document.getElementById('submit-btn').disabled = !allFilled || state.locked;
+}
+
+/* ═══════════════════════════════════════════════════
+   TILE INTERACTIONS
+═══════════════════════════════════════════════════ */
+
+/* Tap a tray tile → place into next empty answer slot */
+function placeTile(tileId) {
+  if (state.locked) return;
+  const tile = state.tiles.find(t => t.id === tileId);
+  if (!tile || tile.used) return;
+
+  const emptyIndex = state.answerSlots.findIndex(s => s === null);
+  if (emptyIndex === -1) return;
+
+  tile.used = true;
+  state.answerSlots[emptyIndex] = { letter: tile.letter, tileId: tile.id };
+
+  renderAll();
+}
+
+/* Tap a filled answer slot → return tile back to tray */
+function returnTile(slotIndex) {
+  if (state.locked) return;
+  const slot = state.answerSlots[slotIndex];
+  if (!slot) return;
+
+  const tile = state.tiles.find(t => t.id === slot.tileId);
+  if (tile) tile.used = false;
+
+  state.answerSlots[slotIndex] = null;
+
+  renderAll();
+}
+
+/* ═══════════════════════════════════════════════════
+   SPEECH
+═══════════════════════════════════════════════════ */
+function speak() {
+  const word = state.currentWord?.english;
+  if (!word) return;
+  const utt = new SpeechSynthesisUtterance(word);
+  utt.lang = 'en-US';
+  utt.rate = 0.85;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(utt);
+}
+
+/* ═══════════════════════════════════════════════════
+   SUBMIT / CHECK
+═══════════════════════════════════════════════════ */
+function handleSubmit() {
+  if (state.locked) return;
+  if (!state.answerSlots.every(s => s !== null)) return;
+
+  state.locked = true;
+  document.getElementById('submit-btn').disabled = true;
+
+  const answer   = state.currentWord.english.toLowerCase();
+  const typed    = state.answerSlots.map(s => s.letter).join('').toLowerCase();
+  const isCorrect = typed === answer;
+
+  // Build per-letter colour feedback
+  const colorStates = answer.split('').map((ch, i) =>
+    state.answerSlots[i].letter.toLowerCase() === ch ? 'correct' : 'incorrect'
+  );
+
+  renderAnswerSlots(colorStates);
+
+  if (isCorrect) {
+    state.score++;
+    document.getElementById('score-text').textContent = `⭐ ${state.score}`;
+    playBell();
+    showStar();
+    setTimeout(() => nextOrFinish(), 1000);
+
+  } else {
+    // Shake slots
+    const slotsEl = document.getElementById('answer-slots');
+    slotsEl.classList.add('shake');
+    setTimeout(() => slotsEl.classList.remove('shake'), 500);
+
+    // Mark attempt dot used
+    document.getElementById(`dot-${state.attempt}`).classList.add('used');
+
+    if (state.attempt === 1) {
+      state.attempt = 2;
+      // Reset tiles & slots for 2nd attempt
+      setTimeout(() => {
+        state.tiles.forEach(t => t.used = false);
+        state.answerSlots = Array(state.currentWord.english.length).fill(null);
+        state.locked = false;
+        renderAll();
+      }, 900);
+    } else {
+      // Show correct answer then advance
+      setTimeout(() => {
+        showAnswerReveal(answer);
+        setTimeout(() => nextOrFinish(), 1300);
+      }, 900);
+    }
+  }
+}
+
+function showAnswerReveal(answer) {
+  const el = document.getElementById('answer-reveal');
+  document.getElementById('answer-reveal-text').textContent = answer;
+  el.style.display = 'block';
+}
+
+/* ═══════════════════════════════════════════════════
+   NEXT QUESTION OR FINISH
+═══════════════════════════════════════════════════ */
+function nextOrFinish() {
+  state.currentIndex++;
+  if (state.currentIndex >= WORDS_PER_SESSION) {
+    finishGame();
+  } else {
+    loadQuestion();
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   FINISH GAME
+═══════════════════════════════════════════════════ */
+function finishGame() {
+  if (state.mode === 'challenge') stopTimer();
+
+  const pct   = state.score / WORDS_PER_SESSION;
+  const emoji = pct >= 0.9 ? '🏆' : pct >= 0.6 ? '🎉' : '💪';
+  const title = pct >= 0.9 ? 'Amazing!!' : pct >= 0.6 ? 'Great Job!' : 'Keep Trying!';
+
+  document.getElementById('result-emoji').textContent = emoji;
+  document.getElementById('result-title').textContent = title;
+  document.getElementById('result-score').textContent = `${state.score} / ${WORDS_PER_SESSION}`;
+
+  const timeRow = document.getElementById('result-time-row');
+  const bestRow = document.getElementById('result-best-row');
+
+  if (state.mode === 'challenge') {
+    document.getElementById('result-time').textContent = formatTime(state.elapsedSeconds);
+    timeRow.style.display = 'flex';
+
+    const prevBest = localStorage.getItem('spelling_best_time');
+    let   newBest  = false;
+    if (!prevBest || state.elapsedSeconds < parseInt(prevBest)) {
+      localStorage.setItem('spelling_best_time', state.elapsedSeconds);
+      newBest = true;
+    }
+    const bestVal = localStorage.getItem('spelling_best_time');
+    document.getElementById('result-best').textContent =
+      formatTime(parseInt(bestVal)) + (newBest ? ' 🆕' : '');
+    bestRow.style.display = 'flex';
+
+  } else {
+    timeRow.style.display = 'none';
+    bestRow.style.display = 'none';
+  }
+
+  showScreen('screen-result');
+}
+
+/* ═══════════════════════════════════════════════════
+   PLAY AGAIN / BACK TO START
+═══════════════════════════════════════════════════ */
+function playAgain() { startGame(state.mode); }
+function goToStart() { stopTimer(); showScreen('screen-start'); }
+
+/* ═══════════════════════════════════════════════════
+   AUDIO — cheerful bell via Web Audio API
+═══════════════════════════════════════════════════ */
+function playBell() {
+  try {
+    const ctx  = new (window.AudioContext || window.webkitAudioContext)();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.6);
+  } catch(e) {}
+}
+
+/* ═══════════════════════════════════════════════════
+   STAR ANIMATION
+═══════════════════════════════════════════════════ */
+function showStar() {
+  const star = document.createElement('div');
+  star.className   = 'star-pop';
+  star.textContent = '⭐';
+  document.body.appendChild(star);
+  setTimeout(() => star.remove(), 900);
+}
+
+/* ═══════════════════════════════════════════════════
+   UTILITY — Fisher-Yates shuffle
+═══════════════════════════════════════════════════ */
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/* Prevent iOS scroll/bounce — no keyboard so this is safe */
+document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+</script>
+
+</body>
+</html>
